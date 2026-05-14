@@ -2,16 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Upload, Activity, ShieldCheck, Info, Camera, RefreshCcw, LayoutPanelLeft, Video, StopCircle } from 'lucide-react';
 
-const API_URL = "http://localhost:8000/predict";
+const API_URL = "http://127.0.0.1:8000/predict";
 
 const SkincareApp = () => {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [results, setResults] = useState([]);
   const [advices, setAdvices] = useState([]);
+  const [warning, setWarning] = useState("");
   const [loading, setLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [facingMode, setFacingMode] = useState("user"); // "user" hoặc "environment"
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const videoRef = useRef(null);
@@ -27,7 +29,18 @@ const SkincareApp = () => {
       setPreview(URL.createObjectURL(file));
       setResults([]);
       setAdvices([]);
+      setWarning("");
       setHasAnalyzed(false);
+    }
+  };
+
+  // Chuyển đổi Camera Trước/Sau
+  const switchCamera = () => {
+    const nextMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextMode);
+    if (isLive) {
+      stopLiveMode();
+      setTimeout(() => startLiveMode(nextMode), 100);
     }
   };
 
@@ -40,15 +53,15 @@ const SkincareApp = () => {
         alert("Trình duyệt của bạn không hỗ trợ truy cập camera hoặc đang ở môi trường không an toàn (cần HTTPS hoặc localhost).");
         return;
       }
-      startLiveMode();
+      startLiveMode(facingMode);
     }
   };
 
-  const startLiveMode = async () => {
+  const startLiveMode = async (mode = "user") => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: "user",
+          facingMode: mode,
           width: { ideal: 1920 }, // Yêu cầu độ phân giải Full HD nếu có
           height: { ideal: 1080 },
           frameRate: { ideal: 30 }
@@ -60,6 +73,7 @@ const SkincareApp = () => {
       setImage(null);
       setResults([]);
       setAdvices([]);
+      setWarning("");
     } catch (err) {
       console.error("Error accessing camera:", err);
       alert("Không thể truy cập camera. Vui lòng kiểm tra quyền trình duyệt!");
@@ -68,12 +82,34 @@ const SkincareApp = () => {
 
   // Hàm chụp ảnh tĩnh chất lượng cao từ Camera
   const captureHighRes = () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || videoRef.current.videoWidth === 0) {
+      alert("Camera chưa sẵn sàng hoặc không tìm thấy dữ liệu video.");
+      return;
+    }
     
     // Tạm dừng vòng lặp quét tự động để tập trung phân tích ảnh tĩnh này
     if (analysisInterval.current) clearInterval(analysisInterval.current);
     
     setLoading(true);
+    setWarning("");
+    
+    // Hiệu ứng nháy màn hình (Flash effect)
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'white';
+    overlay.style.zIndex = '9999';
+    overlay.style.opacity = '0.8';
+    overlay.style.transition = 'opacity 0.3s ease-out';
+    document.body.appendChild(overlay);
+    setTimeout(() => {
+      overlay.style.opacity = '0';
+      setTimeout(() => document.body.removeChild(overlay), 300);
+    }, 50);
+
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
@@ -81,7 +117,11 @@ const SkincareApp = () => {
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(async (blob) => {
-      if (!blob) return;
+      if (!blob) {
+        alert("Không thể trích xuất dữ liệu ảnh từ camera.");
+        setLoading(false);
+        return;
+      }
       const formData = new FormData();
       formData.append('file', blob, 'high_res_capture.jpg');
 
@@ -90,26 +130,33 @@ const SkincareApp = () => {
         if (response.data.status === "success") {
           setResults(response.data.data);
           setAdvices(response.data.advices || []);
-          // Hiển thị thông báo đã phân tích xong ảnh tĩnh
+          setWarning(response.data.warning || "");
+          setHasAnalyzed(true);
+          alert("Đã chụp và phân tích xong! Hãy xem kết quả ở cột bên phải.");
+        } else {
+          alert("Lỗi từ server: " + response.data.message);
         }
       } catch (error) {
         console.error("High-res analysis failed:", error);
+        alert("Không thể kết nối với Backend AI. Hãy chắc chắn bạn đã bật server!");
       } finally {
         setLoading(false);
         // Sau 3 giây tự động quay lại chế độ quét live
         setTimeout(() => {
-          if (isLive) {
+          if (isLive && !analysisInterval.current) {
             analysisInterval.current = setInterval(captureAndAnalyze, 1000);
           }
         }, 3000);
       }
-    }, 'image/jpeg', 0.9); // Chất lượng cao hơn (90%)
+    }, 'image/jpeg', 0.9);
   };
 
   // Effect xử lý khi luồng camera đã sẵn sàng
   useEffect(() => {
     if (isLive && videoRef.current && streamRef.current) {
+      console.log("Setting video srcObject", streamRef.current);
       videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(err => console.error("Error playing video:", err));
       
       // Bắt đầu vòng lặp phân tích sau khi video đã bắt đầu phát
       analysisInterval.current = setInterval(() => {
@@ -123,14 +170,20 @@ const SkincareApp = () => {
   }, [isLive]);
 
   const stopLiveMode = () => {
+    console.log("Stopping live mode");
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log("Stopped track:", track.label);
+      });
+      streamRef.current = null;
     }
     if (analysisInterval.current) {
       clearInterval(analysisInterval.current);
     }
     setIsLive(false);
     setResults([]);
+    setWarning("");
   };
 
   const captureAndAnalyze = async () => {
@@ -152,6 +205,7 @@ const SkincareApp = () => {
         if (response.data.status === "success") {
           setResults(response.data.data);
           setAdvices(response.data.advices || []);
+          setWarning(response.data.warning || "");
           setHasAnalyzed(true);
         }
       } catch (error) {
@@ -165,6 +219,7 @@ const SkincareApp = () => {
     if (!image) return;
     setLoading(true);
     setHasAnalyzed(false);
+    setWarning("");
     const formData = new FormData();
     formData.append('file', image);
 
@@ -173,6 +228,7 @@ const SkincareApp = () => {
       if (response.data.status === "success") {
         setResults(response.data.data);
         setAdvices(response.data.advices || []);
+        setWarning(response.data.warning || "");
         setHasAnalyzed(true);
       }
     } catch (error) {
@@ -269,6 +325,14 @@ const SkincareApp = () => {
           <h1 className="text-xl font-bold tracking-tight">AI Skincare Pro</h1>
         </div>
         <div className="flex gap-4">
+          {isLive && (
+            <button 
+              onClick={switchCamera}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition"
+            >
+              <RefreshCcw className="w-4 h-4"/> Đổi Camera
+            </button>
+          )}
           <button 
             onClick={toggleLiveMode}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition ${isLive ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}
@@ -373,6 +437,12 @@ const SkincareApp = () => {
         </div>
 
         <div className="lg:col-span-4 space-y-6">
+          {warning && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl flex items-start gap-3 animate-pulse">
+              <Info className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <p className="text-sm font-medium">{warning}</p>
+            </div>
+          )}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2 border-b pb-3">
               <ShieldCheck className="w-5 h-5 text-emerald-500" />

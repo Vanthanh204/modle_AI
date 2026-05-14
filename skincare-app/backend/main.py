@@ -4,6 +4,8 @@ from ultralytics import YOLO
 import shutil
 import os
 import uvicorn
+import cv2
+import numpy as np
 
 app = FastAPI()
 
@@ -22,6 +24,19 @@ if os.path.exists(model_path):
 else:
     print("CẢNH BÁO: Không tìm thấy file best.pt!")
     model = None
+
+def check_blur(image_path, threshold=40):
+    """
+    Kiểm tra xem ảnh có bị mờ không dựa trên phương sai của Laplacian.
+    Giá trị threshold càng cao yêu cầu ảnh càng sắc nét.
+    """
+    image = cv2.imread(image_path)
+    if image is None:
+        return 0, False
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Tính toán phương sai của Laplacian (Laplacian Variance)
+    fm = cv2.Laplacian(gray, cv2.CV_64F).var()
+    return float(fm), bool(fm > threshold)
 
 @app.get("/")
 async def root():
@@ -72,6 +87,10 @@ async def predict_skincare(file: UploadFile = File(...)):
     with open(temp_file, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
+    # Kiểm tra độ mờ của ảnh
+    sharpness_score, is_sharp = check_blur(temp_file)
+    
+    # Dự đoán bằng YOLO
     results = model.predict(source=temp_file, conf=0.20, imgsz=640)
     
     predictions = []
@@ -82,7 +101,7 @@ async def predict_skincare(file: UploadFile = File(...)):
             predictions.append({
                 "label": label,
                 "confidence": round(float(box.conf), 2),
-                "box": [round(x, 2) for x in box.xyxy[0].tolist()]
+                "box": [round(float(x), 2) for x in box.xyxy[0].tolist()]
             })
             detected_labels.add(label)
     
@@ -99,13 +118,21 @@ async def predict_skincare(file: UploadFile = File(...)):
             'content': 'Duy trì làm sạch, dưỡng ẩm và chống nắng hàng ngày để bảo vệ hàng rào bảo vệ da.'
         })
 
+    # Tạo cảnh báo nếu ảnh bị mờ
+    warning = ""
+    if not is_sharp:
+        warning = f"⚠️ CẢNH BÁO: Hình ảnh có dấu hiệu bị mờ (Độ nét: {int(sharpness_score)}). Kết quả AI có thể bị sai lệch. Hãy lau ống kính hoặc giữ máy tĩnh hơn!"
+
     if os.path.exists(temp_file):
         os.remove(temp_file)
         
     return {
         "status": "success", 
         "data": predictions,
-        "advices": advices
+        "advices": advices,
+        "sharpness": round(float(sharpness_score), 2),
+        "is_sharp": bool(is_sharp),
+        "warning": warning
     }
 
 if __name__ == "__main__":
