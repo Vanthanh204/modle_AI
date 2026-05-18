@@ -11,6 +11,25 @@ export const AuthProvider = ({ children }) => {
     const API_URL = "http://localhost:8000";
 
     useEffect(() => {
+        let isMounted = true;
+        
+        const fetchUser = async () => {
+            try {
+                const response = await axios.get(`${API_URL}/users/me`);
+                if (isMounted) {
+                    setUser(response.data);
+                }
+            } catch (error) {
+                if (isMounted) {
+                    logout();
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
         if (token) {
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             fetchUser();
@@ -18,18 +37,11 @@ export const AuthProvider = ({ children }) => {
             delete axios.defaults.headers.common['Authorization'];
             setLoading(false);
         }
-    }, [token]);
 
-    const fetchUser = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/users/me`);
-            setUser(response.data);
-        } catch (error) {
-            logout();
-        } finally {
-            setLoading(false);
-        }
-    };
+        return () => {
+            isMounted = false;
+        };
+    }, [token]);
 
     const login = async (email, password) => {
         const formData = new FormData();
@@ -41,9 +53,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', access_token);
         setToken(access_token);
         
-        // Fetch user immediately after login
-        axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-        await fetchUser();
+        // Headers will be set by the useEffect when token state changes
         return true;
     };
 

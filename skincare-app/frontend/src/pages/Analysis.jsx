@@ -213,7 +213,7 @@ const Analysis = () => {
                                     <div className="grid grid-cols-2 gap-4 mb-8">
                                         <div className="bg-blue-50 p-4 rounded-2xl">
                                             <p className="text-xs text-blue-600 font-bold uppercase mb-1">Loại da</p>
-                                            <p className="text-lg font-extrabold text-blue-900 capitalize">{result?.skin_type?.label?.replace('_', ' ') || "Đang xác định..."}</p>
+                                            <p className="text-lg font-extrabold text-blue-900">{result?.skin_type?.label || "Đang xác định..."}</p>
                                         </div>
                                         <div className="bg-indigo-50 p-4 rounded-2xl">
                                             <p className="text-xs text-indigo-600 font-bold uppercase mb-1">Độ chính xác</p>

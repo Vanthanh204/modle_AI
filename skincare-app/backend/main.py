@@ -100,27 +100,51 @@ def check_brightness(image_path, threshold=50):
 
 # Bản đồ dịch tự động linh hoạt
 def get_vi_label(label):
+    if not label:
+        return label
+    
+    label_lower = label.lower().strip()
     mapping = {
-        'combination_skin': 'Da hỗn hợp', 'dry_skin': 'Da khô', 'oily_skin': 'Da dầu',
-        'Blackheads': 'Mụn đầu đen', 'blackhead': 'Mụn đầu đen',
-        'Combination skin': 'Da hỗn hợp', 'Dry skin': 'Da khô',
-        'Dull skin': 'Da xỉn màu', 'Enlarged pores': 'Lỗ chân lông to', 'Freckles': 'Tàn nhang',
-        'Hyperpigmentation': 'Thâm da/Tăng sắc tố', 'Inflammatory acne': 'Mụn viêm',
-        'Melasma': 'Nám da', 'Oily skin': 'Da dầu', 'Psoriasis': 'Vảy nến',
-        'Whiteheads': 'Mụn đầu trắng', 'whitehead': 'Mụn đầu trắng',
-        'Wrinkles': 'Nếp nhăn', 'cystic acne': 'Mụn nang', 'acne': 'Mụn',
-        'pimple': 'Mụn bọc', 'scar': 'Sẹo'
+        'combination_skin': 'Da hỗn hợp', 
+        'dry_skin': 'Da khô', 
+        'oily_skin': 'Da dầu',
+        'normal_skin': 'Da thường',
+        'blackheads': 'Mụn đầu đen', 
+        'blackhead': 'Mụn đầu đen',
+        'combination skin': 'Da hỗn hợp', 
+        'dry skin': 'Da khô',
+        'dull skin': 'Da xỉn màu', 
+        'enlarged pores': 'Lỗ chân lông to', 
+        'freckles': 'Tàn nhang',
+        'hyperpigmentation': 'Thâm da/Tăng sắc tố', 
+        'inflammatory acne': 'Mụn viêm',
+        'melasma': 'Nám da', 
+        'oily skin': 'Da dầu', 
+        'psoriasis': 'Vảy nến',
+        'whiteheads': 'Mụn đầu trắng', 
+        'whitehead': 'Mụn đầu trắng',
+        'wrinkles': 'Nếp nhăn', 
+        'cystic acne': 'Mụn nang', 
+        'acne': 'Mụn',
+        'pimple': 'Mụn bọc', 
+        'scar': 'Sẹo',
+        'dark circles': 'Quầng thâm mắt',
+        'redness': 'Mẩn đỏ',
+        'sunburn': 'Cháy nắng'
     }
-    return mapping.get(label, label)
+    return mapping.get(label_lower, label)
 
-# Dữ liệu lời khuyên mở rộng
+# Dữ liệu lời khuyên mở rộng (Sử dụng key là nhãn gốc để tra cứu chính xác)
 ADVICE_DATABASE = {
     'oily_skin': {'title': 'Chăm sóc Da dầu', 'content': 'Sử dụng sữa rửa mặt dạng Gel pH 5.5, dùng Niacinamide để kiềm dầu.'},
     'dry_skin': {'title': 'Chăm sóc Da khô', 'content': 'Dùng sữa rửa mặt dạng Cream, cấp ẩm sâu bằng Hyaluronic Acid.'},
     'combination_skin': {'title': 'Chăm sóc Da hỗn hợp', 'content': 'Làm sạch kỹ vùng chữ T và dưỡng ẩm sâu cho vùng chữ U.'},
+    'blackheads': {'title': 'Trị Mụn đầu đen', 'content': 'Sử dụng BHA định kỳ để làm sạch sâu lỗ chân lông.'},
     'Blackheads': {'title': 'Trị Mụn đầu đen', 'content': 'Sử dụng BHA định kỳ để làm sạch sâu lỗ chân lông.'},
     'Enlarged pores': {'title': 'Thu nhỏ Lỗ chân lông', 'content': 'Kết hợp dùng Retinoids và đắp mặt nạ đất sét hàng tuần.'},
-    'Melasma': {'title': 'Điều trị Nám da', 'content': 'Sử dụng các hoạt chất làm sáng như Vitamin C hoặc Arbutin.'}
+    'Melasma': {'title': 'Điều trị Nám da', 'content': 'Sử dụng các hoạt chất làm sáng như Vitamin C hoặc Arbutin.'},
+    'hyperpigmentation': {'title': 'Mờ thâm sáng da', 'content': 'Sử dụng Serum Vitamin C và kem chống nắng đầy đủ hàng ngày.'},
+    'wrinkles': {'title': 'Chống lão hóa', 'content': 'Bổ sung Retinol vào quy trình ban đêm để tăng sinh collagen.'}
 }
 
 # --- AUTH ENDPOINTS ---
@@ -260,8 +284,8 @@ async def predict_skincare(
     
     # 4. Tổng hợp lời khuyên
     advices = []
-    if skin_type_label in ADVICE_DATABASE:
-        advices.append(ADVICE_DATABASE[skin_type_label])
+    if raw_type_label in ADVICE_DATABASE:
+        advices.append(ADVICE_DATABASE[raw_type_label])
     
     for prob_label in unique_problem_labels:
         if prob_label in ADVICE_DATABASE and ADVICE_DATABASE[prob_label] not in advices:

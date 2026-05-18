@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Calendar, Camera, History, ChevronRight, BarChart3, Clock, X } from 'lucide-react';
+import { User, Mail, Calendar, Camera, History, ChevronRight, BarChart3, Clock, X, LogOut } from 'lucide-react';
 
 const Profile = () => {
-    const { user, setUser, API_URL } = useAuth();
+    const { user, setUser, logout, API_URL } = useAuth();
+    const navigate = useNavigate();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
@@ -24,6 +26,11 @@ const Profile = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
     };
 
     const handleAvatarChange = async (e) => {
@@ -89,6 +96,14 @@ const Profile = () => {
                                 <span className="text-gray-600">Đã tham gia: {new Date(user.created_at).toLocaleDateString('vi-VN')}</span>
                             </div>
                         </div>
+
+                        <button 
+                            onClick={handleLogout}
+                            className="w-full mt-8 flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-red-600 font-bold rounded-2xl hover:bg-red-100 transition-all duration-200"
+                        >
+                            <LogOut className="h-5 w-5" />
+                            Đăng xuất
+                        </button>
                     </div>
 
                     <div className="bg-blue-600 rounded-3xl p-8 text-white shadow-xl shadow-blue-200">
@@ -134,7 +149,7 @@ const Profile = () => {
                                             </div>
                                             <div className="flex-grow min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-bold text-gray-900 capitalize">{item.skin_type_label.replace('_', ' ')}</span>
+                                                    <span className="font-bold text-gray-900">{item.skin_type_label}</span>
                                                     <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-medium">
                                                         {Math.round(item.skin_type_conf * 100)}%
                                                     </span>
@@ -220,7 +235,7 @@ const Profile = () => {
                             <div className="grid grid-cols-2 gap-4 mb-8">
                                 <div className="bg-blue-50 p-4 rounded-2xl">
                                     <p className="text-xs text-blue-600 font-bold uppercase mb-1">Loại da</p>
-                                    <p className="text-lg font-extrabold text-blue-900 capitalize">{selectedItem.skin_type_label.replace('_', ' ')}</p>
+                                    <p className="text-lg font-extrabold text-blue-900">{selectedItem.skin_type_label}</p>
                                 </div>
                                 <div className="bg-indigo-50 p-4 rounded-2xl">
                                     <p className="text-xs text-indigo-600 font-bold uppercase mb-1">Độ chính xác</p>
