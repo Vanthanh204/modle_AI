@@ -64,8 +64,8 @@ async def global_exception_handler(request, exc):
     )
 
 # 1. Load 2 bộ não AI
-type_model_path = "skin_type.pt"
-problem_model_path = "skin_problems.pt"
+type_model_path = "best_classify.pt"
+problem_model_path = "best_detect.pt"
 
 type_model = None
 problem_model = None
