@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Camera, Upload, RefreshCw, AlertTriangle, CheckCircle, Info, Beaker, BarChart3 } from 'lucide-react';
+import CameraScanner from '../components/CameraScanner';
 
 const Analysis = () => {
     const { API_URL } = useAuth();
@@ -10,16 +11,34 @@ const Analysis = () => {
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [showCamera, setShowCamera] = useState(false);
     const fileInputRef = useRef(null);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
             setSelectedFile(file);
-            setPreviewUrl(URL.createObjectURL(file));
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result);
+            };
+            reader.readAsDataURL(file);
             setResult(null);
             setError(null);
         }
+    };
+
+    const handleCapture = (blob) => {
+        const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+        setSelectedFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setPreviewUrl(reader.result);
+        };
+        reader.readAsDataURL(file);
+        setResult(null);
+        setError(null);
+        setShowCamera(false);
     };
 
     const handleAnalyze = async () => {
@@ -34,6 +53,10 @@ const Analysis = () => {
         try {
             const response = await axios.post(`${API_URL}/predict`, formData);
             setResult(response.data);
+            
+            if (response.data.image_url === "error_upload") {
+                console.warn("Lưu ý: Ảnh không thể tải lên máy chủ Cloudinary, nhưng kết quả phân tích vẫn được hiển thị.");
+            }
         } catch (err) {
             setError(err.response?.data?.detail || 'Lỗi khi phân tích hình ảnh. Vui lòng thử lại.');
         } finally {
@@ -54,40 +77,46 @@ const Analysis = () => {
             <div className="absolute bottom-10 right-10 w-96 h-96 bg-orange-200/20 rounded-full blur-3xl"></div>
             <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
                 <div className="text-center mb-14">
-
-                    {/* Badge */}
-
-
-                    {/* Title */}
                     <h2 className="text-5xl md:text-6xl font-black leading-tight text-gray-900">
                         Phân tích
                         <span className="bg-gradient-to-r from-rose-500 via-pink-500 to-orange-400 bg-clip-text text-transparent">
                             {' '}làn da
                         </span>
-
                     </h2>
-
-                    {/* Description */}
                     <p className="mt-5 max-w-2xl mx-auto text-lg md:text-xl text-gray-500 leading-relaxed">
-                        Tải lên ảnh khuôn mặt để AI bắt đầu quá trình nhận diện,
+                        Tải lên ảnh khuôn mặt hoặc chụp trực tiếp từ camera để AI bắt đầu quá trình nhận diện,
                         phân tích loại da và phát hiện các vấn đề da phổ biến.
                     </p>
-
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
                     {/* Upload Section */}
                     <div className="bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_60px_rgba(255,120,150,0.12)] p-8 border border-white">
                         {!previewUrl ? (
-                            <div
-                                onClick={() => fileInputRef.current.click()}
-                                className="aspect-square border-2 border-dashed border-rose-200 rounded-[28px] flex flex-col items-center justify-center cursor-pointer bg-gradient-to-br from-rose-50 to-orange-50 hover:border-rose-400 transition-all group"
-                            >
-                                <div className="w-24 h-24 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center mb-5 shadow-xl group-hover:scale-110 transition-transform">
-                                    <Upload className="h-9 w-9 text-white" />
+                            <div className="space-y-4">
+                                <div
+                                    onClick={() => fileInputRef.current.click()}
+                                    className="aspect-square border-2 border-dashed border-rose-200 rounded-[28px] flex flex-col items-center justify-center cursor-pointer bg-gradient-to-br from-rose-50 to-orange-50 hover:border-rose-400 transition-all group"
+                                >
+                                    <div className="w-20 h-20 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center mb-5 shadow-xl group-hover:scale-110 transition-transform">
+                                        <Upload className="h-8 w-8 text-white" />
+                                    </div>
+                                    <p className="text-lg font-semibold text-gray-700">Tải ảnh lên</p>
+                                    <p className="text-sm text-gray-400 mt-2 text-center px-4">Kéo thả hoặc nhấn để chọn file</p>
                                 </div>
-                                <p className="text-lg font-semibold text-gray-700">Chọn hoặc kéo ảnh vào đây</p>
-                                <p className="text-sm text-gray-400 mt-2">Hỗ trợ JPG, PNG (Tối đa 5MB)</p>
+                                
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-200"></span></div>
+                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-500">Hoặc</span></div>
+                                </div>
+
+                                <button
+                                    onClick={() => setShowCamera(true)}
+                                    className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-lg"
+                                >
+                                    <Camera className="h-5 w-5" />
+                                    Chụp ảnh từ Camera
+                                </button>
                             </div>
                         ) : (
                             <div className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-inner flex items-center justify-center">
@@ -97,46 +126,22 @@ const Analysis = () => {
                                         alt="Preview"
                                         className="max-w-full max-h-[500px] object-contain block mx-auto rounded-2xl"
                                     />
-                                    {result && result.problems && result.problems.map((p, idx) => {
-                                        return (
-                                            <div
-                                                key={idx}
-                                                        className="
-                                                            absolute
-                                                            border-[1.5px]
-                                                            border-[#ff4d8d]
-                                                            rounded-lg
-                                                            pointer-events-none
-                                                            shadow-[0_0_20px_rgba(255,77,141,0.35)]
-                                                        "
-                                                style={{
-                                                    left: `${p.box[0] * 100}%`,
-                                                    top: `${p.box[1] * 100}%`,
-                                                    width: `${(p.box[2] - p.box[0]) * 100}%`,
-                                                    height: `${(p.box[3] - p.box[1]) * 100}%`,
-                                                }}
-                                            >
-                                                <div
-                                                    className="
-                                                                absolute
-                                                                -top-2
-                                                                left-0
-                                                                bg-[#0f172a]
-                                                                text-white
-                                                                text-[10px]
-                                                                font-semibold
-                                                                px-2
-                                                                py-1
-                                                                rounded-md
-                                                                whitespace-nowrap
-                                                                shadow-lg
-                                                            "
-                                                >
-                                                    {p.label} ({Math.round(p.confidence * 100)}%)
-                                                </div>
+                                    {result && result.problems && result.problems.map((p, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="absolute border-[1.5px] border-[#ff4d8d] rounded-lg pointer-events-none shadow-[0_0_20px_rgba(255,77,141,0.35)]"
+                                            style={{
+                                                left: `${p.box[0] * 100}%`,
+                                                top: `${p.box[1] * 100}%`,
+                                                width: `${(p.box[2] - p.box[0]) * 100}%`,
+                                                height: `${(p.box[3] - p.box[1]) * 100}%`,
+                                            }}
+                                        >
+                                            <div className="absolute -top-2 left-0 bg-[#0f172a] text-white text-[10px] font-semibold px-2 py-1 rounded-md whitespace-nowrap shadow-lg">
+                                                {p.label} ({Math.round(p.confidence * 100)}%)
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -167,7 +172,7 @@ const Analysis = () => {
                             {previewUrl && (
                                 <button
                                     onClick={reset}
-                                    className="px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl font-bold hover:bg-gray-50 transition-all"
+                                    className="px-6 py-4 bg-white border border-rose-200 text-rose-600 rounded-2xl font-bold hover:bg-rose-50 transition-all"
                                 >
                                     {result ? 'Chụp ảnh mới' : 'Hủy'}
                                 </button>
@@ -178,10 +183,10 @@ const Analysis = () => {
                     {/* Results Section */}
                     <div className="space-y-6">
                         {loading && (
-                            <div className="bg-blue-50 p-8 rounded-3xl border border-blue-100 text-center animate-pulse">
-                                <RefreshCw className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin" />
-                                <h3 className="text-xl font-bold text-blue-900">AI đang xử lý dữ liệu</h3>
-                                <p className="text-blue-700 mt-2">Chúng tôi đang quét qua 15 danh mục bệnh lý để tìm kết quả chính xác nhất cho bạn.</p>
+                            <div className="bg-rose-50 p-8 rounded-3xl border border-rose-100 text-center animate-pulse">
+                                <RefreshCw className="h-12 w-12 text-rose-600 mx-auto mb-4 animate-spin" />
+                                <h3 className="text-xl font-bold text-rose-900">AI đang phân tích làn da</h3>
+                                <p className="text-rose-700 mt-2">Chúng tôi đang quét qua 15 danh mục bệnh lý để tìm kết quả chính xác nhất cho bạn.</p>
                             </div>
                         )}
 
@@ -267,6 +272,12 @@ const Analysis = () => {
                     </div>
                 </div>
             </div>
+            {showCamera && (
+                <CameraScanner 
+                    onCapture={handleCapture} 
+                    onClose={() => setShowCamera(false)} 
+                />
+            )}
         </div>
     );
 };

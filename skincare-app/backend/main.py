@@ -90,15 +90,26 @@ def check_blur(image_path, threshold=40):
     fm = cv2.Laplacian(gray, cv2.CV_64F).var()
     return float(fm), bool(fm > threshold)
 
+def check_brightness(image_path, threshold=50):
+    image = cv2.imread(image_path)
+    if image is None:
+        return 0, False
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    avg_brightness = np.mean(gray)
+    return float(avg_brightness), bool(avg_brightness > threshold)
+
 # Bản đồ dịch tự động linh hoạt
 def get_vi_label(label):
     mapping = {
         'combination_skin': 'Da hỗn hợp', 'dry_skin': 'Da khô', 'oily_skin': 'Da dầu',
-        'Blackheads': 'Mụn đầu đen', 'Combination skin': 'Da hỗn hợp', 'Dry skin': 'Da khô',
+        'Blackheads': 'Mụn đầu đen', 'blackhead': 'Mụn đầu đen',
+        'Combination skin': 'Da hỗn hợp', 'Dry skin': 'Da khô',
         'Dull skin': 'Da xỉn màu', 'Enlarged pores': 'Lỗ chân lông to', 'Freckles': 'Tàn nhang',
         'Hyperpigmentation': 'Thâm da/Tăng sắc tố', 'Inflammatory acne': 'Mụn viêm',
         'Melasma': 'Nám da', 'Oily skin': 'Da dầu', 'Psoriasis': 'Vảy nến',
-        'Whiteheads': 'Mụn đầu trắng', 'Wrinkles': 'Nếp nhăn', 'cystic acne': 'Mụn nang'
+        'Whiteheads': 'Mụn đầu trắng', 'whitehead': 'Mụn đầu trắng',
+        'Wrinkles': 'Nếp nhăn', 'cystic acne': 'Mụn nang', 'acne': 'Mụn',
+        'pimple': 'Mụn bọc', 'scar': 'Sẹo'
     }
     return mapping.get(label, label)
 
@@ -209,9 +220,16 @@ async def predict_skincare(
     with open(temp_file, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # 1. Kiểm tra độ mờ
+    # 1. Kiểm tra chất lượng ảnh
     sharpness_score, is_sharp = check_blur(temp_file)
+    brightness_score, is_bright = check_brightness(temp_file)
     
+    warning_msg = ""
+    if not is_sharp:
+        warning_msg += "Ảnh hơi mờ, kết quả có thể kém chính xác. "
+    if not is_bright:
+        warning_msg += "Ảnh hơi tối, hãy chụp nơi có ánh sáng tốt hơn."
+
     # 2. Dự đoán Loại da
     type_results = type_model.predict(source=temp_file, verbose=False)
     top1_idx = type_results[0].probs.top1
@@ -280,7 +298,10 @@ async def predict_skincare(
         "problems": detected_problems,
         "advices": advices,
         "sharpness": round(float(sharpness_score), 2),
-        "is_sharp": bool(is_sharp)
+        "is_sharp": bool(is_sharp),
+        "brightness": round(float(brightness_score), 2),
+        "is_bright": bool(is_bright),
+        "warning": warning_msg
     }
 
 if __name__ == "__main__":
