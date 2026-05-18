@@ -72,15 +72,15 @@ problem_model = None
 
 if os.path.exists(type_model_path):
     type_model = YOLO(type_model_path)
-    print(f"✅ Đã load mô hình phân loại da: {type_model.names}")
+    print(f"Đã load mô hình phân loại da: {type_model.names}")
 else:
-    print(f"❌ CẢNH BÁO: Không tìm thấy {type_model_path}")
+    print(f"CẢNH BÁO: Không tìm thấy {type_model_path}")
 
 if os.path.exists(problem_model_path):
     problem_model = YOLO(problem_model_path)
-    print(f"✅ Đã load mô hình phát hiện vấn đề: {problem_model.names}")
+    print(f"Đã load mô hình phát hiện vấn đề: {problem_model.names}")
 else:
-    print(f"❌ CẢNH BÁO: Không tìm thấy {problem_model_path}")
+    print(f"CẢNH BÁO: Không tìm thấy {problem_model_path}")
 
 def check_blur(image_path, threshold=40):
     image = cv2.imread(image_path)
@@ -220,7 +220,11 @@ async def predict_skincare(
     skin_type_conf = round(float(type_results[0].probs.top1conf), 2)
     
     # 3. Dự đoán Vấn đề da (Tăng ngưỡng conf lên 0.25 để giảm sai số)
-    problem_results = problem_model.predict(source=temp_file, conf=0.20, imgsz=640, verbose=False)
+    problem_results = problem_model.predict( source=temp_file,
+    conf=0.22,
+    iou=0.35,
+    imgsz=640,
+    verbose=False)
     
     detected_problems = []
     unique_problem_labels = set()
